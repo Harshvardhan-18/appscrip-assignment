@@ -1,63 +1,127 @@
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
-  --card: 240 10% 3.9%;
-  --card-foreground: 0 0% 98%;
-  --popover: 240 10% 3.9%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 0 0% 98%;
-  --primary-foreground: 240 5.9% 10%;
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-  --accent: 240 3.7% 15.9%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --ring: 240 4.9% 83.9%;
-  --radius: 0.5rem;
+  /* Light Theme (Default) */
+  --canvas: #F6F7F9;
+  --surface: #FFFFFF;
+  --ink: #12141A;
+  --muted: #6B7280;
+  --hairline: #E6E8EC;
+  
+  --brand: #2F5BFF;
+  --brand-hover: #2347DB;
+  --brand-soft: rgba(47, 91, 255, 0.08);
+
+  --critical: #E5484D;
+  --critical-bg: rgba(229, 72, 77, 0.08);
+  --warning: #D97706;
+  --warning-bg: rgba(245, 165, 36, 0.12);
+  --healthy: #16A34A;
+  --healthy-bg: rgba(22, 163, 74, 0.1);
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+  --shadow-sheet: -4px 0 24px rgba(0, 0, 0, 0.08);
+}
+
+.dark {
+  /* Dark Theme: Deep blue-grey (#0F1218), NOT pure black */
+  --canvas: #0F1218;
+  --surface: #161B22;
+  --ink: #F0F3F8;
+  --muted: #8B949E;
+  --hairline: #252D38;
+
+  --brand: #3B68FF;
+  --brand-hover: #547BFF;
+  --brand-soft: rgba(59, 104, 255, 0.15);
+
+  --critical: #F87171;
+  --critical-bg: rgba(248, 113, 113, 0.12);
+  --warning: #FBBF24;
+  --warning-bg: rgba(251, 191, 36, 0.14);
+  --healthy: #22C55E;
+  --healthy-bg: rgba(34, 197, 94, 0.12);
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+  --shadow-sheet: -4px 0 32px rgba(0, 0, 0, 0.5);
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  background-color: #09090b;
-  color: #fafafa;
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    sans-serif;
+  background-color: var(--canvas);
+  color: var(--ink);
+  font-family: 'Geist Variable', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+  font-size: 13px;
 }
 
-/* Custom scrollbars for high-density operations panels */
+/* Accessible focus styling */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Custom minimal scrollbar */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #09090b;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #27272a;
-  border-radius: 4px;
+  background: var(--hairline);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
+  background: var(--muted);
+}
+
+/* Tabular figures for monospace numbers */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Single motion moment: subtle slide & highlight for new incident */
+@keyframes incidentHighlight {
+  0% {
+    transform: translateY(-8px);
+    background-color: var(--brand-soft);
+  }
+  100% {
+    transform: translateY(0);
+    background-color: transparent;
+  }
+}
+
+.animate-incident-in {
+  animation: incidentHighlight 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

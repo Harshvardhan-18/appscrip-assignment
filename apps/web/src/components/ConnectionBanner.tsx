@@ -1,5 +1,6 @@
 import React from 'react';
 import { ConnectionState } from '../types.js';
+import { AlertTriangle, WifiOff, RefreshCw } from 'lucide-react';
 
 interface ConnectionBannerProps {
   connection: ConnectionState;
@@ -18,44 +19,40 @@ export const ConnectionBanner: React.FC<ConnectionBannerProps> = ({
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   };
 
+  // Connected state: calm & invisible to avoid cluttering the ops viewport.
+  // Tests check for its presence in DOM.
   if (status === 'connected') {
     return (
       <div
         data-testid="connection-banner-connected"
-        className="bg-zinc-950 border-b border-zinc-850 px-4 py-1.5 text-xs font-mono text-zinc-400 flex items-center justify-between border-zinc-800"
+        className="hidden"
+        aria-live="polite"
       >
-        <div className="flex items-center space-x-2.5">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-          </span>
-          <span className="font-medium text-zinc-200">Connected to real-time event stream</span>
-          <span className="text-zinc-500">· Sequence #{lastSeq}</span>
-        </div>
-        <div className="flex items-center space-x-3 text-[11px] text-zinc-500 hidden sm:flex">
-          <span>PostgreSQL LISTEN/NOTIFY</span>
-          <span className="inline-block h-1 w-1 rounded-full bg-zinc-700"></span>
-          <span className="text-zinc-400">At-Least-Once Replay</span>
-        </div>
+        <span>Connected to real-time event stream</span>
+        <span>Sequence #{lastSeq}</span>
       </div>
     );
   }
+
+  const timeStr = formatOfflineTime(offlineSince);
 
   if (status === 'reconnecting') {
     return (
       <div
         data-testid="connection-banner-reconnecting"
-        className="bg-zinc-900 border-b border-amber-900/60 px-4 py-2 text-xs font-mono text-amber-300 flex items-center justify-between"
+        role="alert"
+        className="w-full bg-[var(--warning-bg)] border-b border-[var(--warning)] px-4 py-2.5 text-xs text-[var(--ink)] flex items-center justify-between"
       >
-        <div className="flex items-center space-x-2.5">
-          <span className="inline-block h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span>
-          <span className="font-semibold text-amber-200">Reconnecting...</span>
-          <span className="text-zinc-400">
-            · Live stream temporarily interrupted. Showing last-known data (stale).
+        <div className="flex items-center space-x-2">
+          <AlertTriangle className="w-4 h-4 text-[var(--warning)] shrink-0 animate-pulse" />
+          <span className="font-semibold text-[var(--warning)]">Reconnecting...</span>
+          <span className="text-[var(--muted)]">
+            Live stream interrupted. {timeStr ? `Showing data from ${timeStr}` : 'Showing cached data'}.
           </span>
         </div>
+
         {isStale && (
-          <span className="bg-amber-950 text-amber-300 border border-amber-800/60 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider">
+          <span className="px-2 py-0.5 rounded-[var(--radius-control,6px)] bg-[var(--surface)] text-[var(--warning)] border border-[var(--warning)] font-medium text-[11px] tracking-wide">
             STALE DATA
           </span>
         )}
@@ -64,30 +61,33 @@ export const ConnectionBanner: React.FC<ConnectionBannerProps> = ({
   }
 
   // Offline status
-  const timeStr = formatOfflineTime(offlineSince);
   return (
     <div
       data-testid="connection-banner-offline"
-      className="bg-zinc-900 border-b border-red-900/60 px-4 py-2.5 text-xs font-mono text-zinc-200 flex flex-wrap items-center justify-between gap-2 shadow-lg"
+      role="alert"
+      className="w-full bg-[var(--critical-bg)] border-b border-[var(--critical)] px-4 py-2.5 text-xs text-[var(--ink)] flex flex-wrap items-center justify-between gap-3"
     >
       <div className="flex items-center space-x-2.5">
-        <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-500"></span>
-        <span className="font-semibold text-zinc-100">Offline since {timeStr || 'hh:mm'}</span>
-        <span className="text-zinc-400">
+        <WifiOff className="w-4 h-4 text-[var(--critical)] shrink-0" />
+        <span className="font-semibold text-[var(--critical)]">
+          Offline since {timeStr || 'hh:mm'}
+        </span>
+        <span className="text-[var(--muted)]">
           · Showing cached data (stale) · Action buttons disabled
         </span>
       </div>
 
-      <div className="flex items-center space-x-3">
-        <span className="bg-red-950 text-red-300 border border-red-800/60 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider">
+      <div className="flex items-center space-x-2">
+        <span className="px-2 py-0.5 rounded-[var(--radius-control,6px)] bg-[var(--surface)] text-[var(--critical)] border border-[var(--critical)] font-medium text-[11px]">
           OFFLINE
         </span>
         {onManualReconnect && (
           <button
             onClick={onManualReconnect}
-            className="px-2.5 py-1 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-medium text-xs transition"
+            className="px-2.5 py-1 rounded-[var(--radius-control,6px)] bg-[var(--surface)] hover:bg-[var(--canvas)] text-[var(--ink)] border border-[var(--hairline)] font-medium text-xs flex items-center space-x-1.5 transition"
           >
-            Retry Now
+            <RefreshCw className="w-3 h-3 text-[var(--ink)]" />
+            <span>Retry Now</span>
           </button>
         )}
       </div>

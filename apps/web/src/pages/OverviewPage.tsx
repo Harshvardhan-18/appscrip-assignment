@@ -1,349 +1,418 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { usePlatformStore } from '../store/PlatformContext.js';
-import { Incident } from '../types.js';
-import {
-  Activity,
-  Cpu,
-  ShieldAlert,
-  Clock,
-  ArrowRight,
-  Radio,
-  CheckCircle2,
-  AlertTriangle,
-  ChevronRight,
-  Server,
-  Send,
-} from 'lucide-react';
+import { Sparkline } from '../components/Sparkline.js';
 import { ActionButton } from '../components/ActionButton.js';
+import { groupIncidents, GroupedIncident } from '../utils/incidentGrouping.js';
+import { useToast } from '../components/Toast.js';
+import {
+  ShieldAlert,
+  AlertTriangle,
+  CheckCircle2,
+  Cpu,
+  Activity,
+  Clock,
+  Radio,
+  ArrowRight,
+  Flame,
+  Check,
+} from 'lucide-react';
 
 interface OverviewPageProps {
   onNavigateTab: (tab: string) => void;
   onSelectIncident: (id: string) => void;
 }
 
-export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigateTab, onSelectIncident }) => {
+export const OverviewPage: React.FC<OverviewPageProps> = ({
+  onNavigateTab,
+  onSelectIncident,
+}) => {
   const { state, acknowledgeIncident, resolveIncident } = usePlatformStore();
-  const { stats, incidents, devices, connection } = state;
+  const { stats, incidents, devices, liveEvents, connection } = state;
   const isOffline = connection.status === 'offline';
+  const { showToast } = useToast();
 
-  const incidentsList = Object.values(incidents);
-  const devicesList = Object.values(devices);
-  const openIncidents = incidentsList.filter(
-    (i) => i.status === 'open' || i.status === 'acknowledged'
-  );
+  const [selectedGroupIndex, setSelectedGroupIndex] = useState<number>(0);
 
-  const handleQuickAck = async (e: React.MouseEvent, id: string) => {
+  // Group all open/acknowledged incidents by rule+device
+  const openIncidentsList = useMemo(() => {
+    return Object.values(incidents).filter(
+      (i) => i.status === 'open' || i.status === 'acknowledged'
+    );
+  }, [incidents]);
+
+  const groupedIncidents = useMemo(() => {
+    return groupIncidents(openIncidentsList);
+  }, [openIncidentsList]);
+
+  const devicesList = useMemo(() => Object.values(devices), [devices]);
+  const offlineDevicesCount = useMemo(() => {
+    return devicesList.filter((d) => d.status === 'offline').length;
+  }, [devicesList]);
+
+  const criticalCount = useMemo(() => {
+    return groupedIncidents.filter((g) => g.severity === 'critical' && g.status === 'open').length;
+  }, [groupedIncidents]);
+
+  // Generate human-language status summary sentence
+  const statusSentence = useMemo(() => {
+    if (offlineDevicesCount > 0 && groupedIncidents.length > 0) {
+      return `${offlineDevicesCount} ${offlineDevicesCount === 1 ? 'device is' : 'devices are'} offline and ${groupedIncidents.length} ${groupedIncidents.length === 1 ? 'incident needs' : 'incidents need'} attention`;
+    }
+    if (criticalCount > 0) {
+      return `${criticalCount} critical ${criticalCount === 1 ? 'incident requires' : 'incidents require'} immediate triage`;
+    }
+    if (groupedIncidents.length > 0) {
+      return `${groupedIncidents.length} ${groupedIncidents.length === 1 ? 'incident needs' : 'incidents need'} review`;
+    }
+    if (offlineDevicesCount > 0) {
+      return `${offlineDevicesCount} ${offlineDevicesCount === 1 ? 'device is' : 'devices are'} offline`;
+    }
+    return 'Everything is running normally';
+  }, [offlineDevicesCount, groupedIncidents.length, criticalCount]);
+
+  // Sparkline data simulations based on live stats
+  const rateSparkline = useMemo(() => {
+    const rate = stats?.events_per_minute ?? 100;
+    return [
+      Math.max(10, rate * 0.85),
+      Math.max(10, rate * 0.92),
+      Math.max(10, rate * 0.8),
+      Math.max(10, rate * 1.05),
+      Math.max(10, rate * 0.98),
+      rate,
+    ];
+  }, [stats?.events_per_minute]);
+
+  const delaySparkline = useMemo(() => {
+    const delay = stats?.queue_depth_and_lag?.lag_seconds ?? 0;
+    return [delay + 1, delay, delay + 2, Math.max(0, delay - 1), delay];
+  }, [stats?.queue_depth_and_lag?.lag_seconds]);
+
+  // Quick Action Handlers with Toast Feedback
+  const handleQuickAck = async (e: React.MouseEvent, group: GroupedIncident) => {
     e.stopPropagation();
-    await acknowledgeIncident(id, 'operator:ui', 'Acknowledged from overview');
+    const success = await acknowledgeIncident(group.primaryId, 'operator:ui', 'Operator acknowledged');
+    if (success) {
+      showToast('Acknowledged', `${group.rule_name} on ${group.device_name}`);
+    }
   };
 
-  const handleQuickResolve = async (e: React.MouseEvent, id: string) => {
+  const handleQuickResolve = async (e: React.MouseEvent, group: GroupedIncident) => {
     e.stopPropagation();
-    await resolveIncident(id, 'operator:ui', 'Resolved from overview');
+    const success = await resolveIncident(group.primaryId, 'operator:ui', 'Operator resolved');
+    if (success) {
+      showToast('Resolved', `${group.rule_name} on ${group.device_name}`);
+    }
   };
+
+  // Keyboard Navigation: J/K, A, R, Enter
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input or textarea
+      if (
+        document.activeElement?.tagName === 'INPUT' ||
+        document.activeElement?.tagName === 'TEXTAREA' ||
+        document.activeElement?.tagName === 'SELECT'
+      ) {
+        return;
+      }
+
+      if (e.key === 'j' || e.key === 'J') {
+        e.preventDefault();
+        setSelectedGroupIndex((prev) => Math.min(groupedIncidents.length - 1, prev + 1));
+      } else if (e.key === 'k' || e.key === 'K') {
+        e.preventDefault();
+        setSelectedGroupIndex((prev) => Math.max(0, prev - 1));
+      } else if (e.key === 'a' || e.key === 'A') {
+        const cur = groupedIncidents[selectedGroupIndex];
+        if (cur && cur.status === 'open' && !isOffline) {
+          e.preventDefault();
+          acknowledgeIncident(cur.primaryId, 'operator:keyboard', 'Keyboard shortcut A').then(
+            (ok) => ok && showToast('Acknowledged', `${cur.rule_name} on ${cur.device_name}`)
+          );
+        }
+      } else if (e.key === 'r' || e.key === 'R') {
+        const cur = groupedIncidents[selectedGroupIndex];
+        if (cur && !isOffline) {
+          e.preventDefault();
+          resolveIncident(cur.primaryId, 'operator:keyboard', 'Keyboard shortcut R').then(
+            (ok) => ok && showToast('Resolved', `${cur.rule_name} on ${cur.device_name}`)
+          );
+        }
+      } else if (e.key === 'Enter') {
+        const cur = groupedIncidents[selectedGroupIndex];
+        if (cur) {
+          e.preventDefault();
+          onSelectIncident(cur.primaryId);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [groupedIncidents, selectedGroupIndex, isOffline, acknowledgeIncident, resolveIncident, onSelectIncident, showToast]);
 
   return (
     <div className="space-y-6">
-      {/* Top Banner / Breadcrumb */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900/50 border border-zinc-800 rounded-lg p-5">
-        <div>
-          <div className="flex items-center space-x-2.5">
-            <h2 className="text-lg font-semibold text-zinc-100 tracking-tight">Platform Overview</h2>
-            {connection.isStale && (
-              <span className="text-[10px] font-mono font-medium bg-amber-950/80 text-amber-300 border border-amber-800/60 px-2 py-0.5 rounded">
-                DATA STALE
-              </span>
-            )}
+      {/* 1. Plain-Language Status Hero */}
+      <section className="bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-panel,12px)] p-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
+          <div className="space-y-1">
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[var(--ink)] flex items-center space-x-2.5">
+              <span>{statusSentence}</span>
+              {groupedIncidents.length === 0 && offlineDevicesCount === 0 && (
+                <CheckCircle2 className="w-5 h-5 text-[var(--healthy)] shrink-0" />
+              )}
+            </h1>
+            <p className="text-xs text-[var(--muted)]">
+              Real-time fleet operations snapshot · Updated continuously
+            </p>
           </div>
-          <p className="text-xs text-zinc-400 mt-1 font-mono">
-            Durable operations engine on PostgreSQL 16 · Real-time SSE fan-out
-          </p>
-        </div>
 
-        <div className="flex items-center space-x-3 text-xs">
-          <div className="bg-zinc-950 px-3 py-1.5 rounded-md border border-zinc-800 flex items-center space-x-2 font-mono text-zinc-300">
-            <Activity className="w-3.5 h-3.5 text-zinc-400" />
-            <span className="text-zinc-500">Rate:</span>
-            <span className="font-semibold text-zinc-100">{stats?.events_per_minute ?? 0} ev/m</span>
-          </div>
-          <button
-            onClick={() => onNavigateTab('events')}
-            className="px-3 py-1.5 rounded-md bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-medium transition inline-flex items-center space-x-1 shadow-sm"
-          >
-            <span>Live Stream</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Core Stats Cards Grid (ShadCN style) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Ingestion & Rate */}
-        <div className="bg-zinc-900/40 border border-zinc-800 rounded-lg p-5 hover:border-zinc-700 transition">
-          <div className="flex items-center justify-between text-xs font-mono text-zinc-400 mb-2">
-            <span className="font-medium">INGESTION RATE</span>
-            <Activity className="w-4 h-4 text-zinc-500" />
-          </div>
-          <div className="text-2xl font-bold font-mono text-zinc-100">
-            {stats?.events_per_minute ?? 0}
-            <span className="text-xs font-normal text-zinc-500 ml-1.5">ev / min</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-zinc-800/80 flex items-center justify-between text-xs font-mono text-zinc-400">
-            <span>Buffer Depth</span>
-            <span className="font-medium text-zinc-200">
-              {stats?.queue_depth_and_lag?.depth ?? 0}
-            </span>
+          <div className="text-xs font-mono text-[var(--muted)] shrink-0">
+            {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </div>
         </div>
 
-        {/* Fleet Health */}
-        <div className="bg-zinc-900/40 border border-zinc-800 rounded-lg p-5 hover:border-zinc-700 transition">
-          <div className="flex items-center justify-between text-xs font-mono text-zinc-400 mb-2">
-            <span className="font-medium">DEVICE FLEET</span>
-            <Cpu className="w-4 h-4 text-zinc-500" />
+        {/* 2. Compact Strip of 3 Key Numbers with Sparklines (NO 4 equal square tiles) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-6 mt-6 border-t border-[var(--hairline)]">
+          {/* Metric 1: Events per minute */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <div className="text-xs text-[var(--muted)]">Events per minute</div>
+              <div className="text-2xl font-medium tabular-nums text-[var(--ink)]">
+                {stats?.events_per_minute ?? 0}
+                <span className="text-xs font-normal text-[var(--muted)] ml-1">ev/m</span>
+              </div>
+            </div>
+            <Sparkline data={rateSparkline} color="var(--brand)" />
           </div>
-          <div className="text-2xl font-bold font-mono text-zinc-100">
-            {stats?.devices_by_status?.total ?? devicesList.length}
-            <span className="text-xs font-normal text-zinc-500 ml-1.5">total</span>
+
+          {/* Metric 2: Devices online of total */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <div className="text-xs text-[var(--muted)]">Devices online of total</div>
+              <div className="text-2xl font-medium tabular-nums text-[var(--ink)]">
+                {stats?.devices_by_status?.online ?? devicesList.filter((d) => d.status === 'online').length}
+                <span className="text-xs font-normal text-[var(--muted)] ml-1">
+                  / {stats?.devices_by_status?.total ?? devicesList.length}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center space-x-1 text-xs">
+              {offlineDevicesCount > 0 ? (
+                <span className="text-[var(--critical)] font-medium">
+                  {offlineDevicesCount} offline
+                </span>
+              ) : (
+                <span className="text-[var(--healthy)] font-medium">All online</span>
+              )}
+            </div>
           </div>
-          <div className="mt-3 pt-3 border-t border-zinc-800/80 flex items-center justify-between text-xs font-mono">
-            <span className="text-emerald-400">
-              {stats?.devices_by_status?.online ?? devicesList.filter((d) => d.status === 'online').length} online
-            </span>
-            <span className="text-zinc-500">|</span>
-            <span className="text-amber-400">{stats?.devices_by_status?.stale ?? 0} stale</span>
-            <span className="text-zinc-500">|</span>
-            <span className="text-red-400">{stats?.devices_by_status?.offline ?? 0} offline</span>
+
+          {/* Metric 3: Processing delay */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <div className="text-xs text-[var(--muted)]">Processing delay</div>
+              <div className="text-2xl font-medium tabular-nums text-[var(--ink)]">
+                {stats?.queue_depth_and_lag?.lag_seconds ?? 0}
+                <span className="text-xs font-normal text-[var(--muted)] ml-1">seconds</span>
+              </div>
+            </div>
+            <Sparkline data={delaySparkline} color="var(--healthy)" />
           </div>
         </div>
+      </section>
 
-        {/* Incidents by Severity */}
-        <div className="bg-zinc-900/40 border border-zinc-800 rounded-lg p-5 hover:border-zinc-700 transition">
-          <div className="flex items-center justify-between text-xs font-mono text-zinc-400 mb-2">
-            <span className="font-medium">ACTIVE INCIDENTS</span>
-            <ShieldAlert className="w-4 h-4 text-zinc-500" />
-          </div>
-          <div className="text-2xl font-bold font-mono text-zinc-100">
-            {openIncidents.length}
-            <span className="text-xs font-normal text-zinc-500 ml-1.5">open / ack</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-zinc-800/80 flex items-center justify-between text-xs font-mono">
-            <span className="text-red-400 font-medium">
-              {stats?.open_incidents_by_severity?.critical ?? 0} Critical
-            </span>
-            <span className="text-amber-400">
-              {stats?.open_incidents_by_severity?.warning ?? 0} Warning
-            </span>
-            <span className="text-zinc-400">
-              {stats?.open_incidents_by_severity?.info ?? 0} Info
-            </span>
-          </div>
-        </div>
-
-        {/* Processing Queue & Lag */}
-        <div className="bg-zinc-900/40 border border-zinc-800 rounded-lg p-5 hover:border-zinc-700 transition">
-          <div className="flex items-center justify-between text-xs font-mono text-zinc-400 mb-2">
-            <span className="font-medium">QUEUE LAG</span>
-            <Clock className="w-4 h-4 text-zinc-500" />
-          </div>
-          <div className="text-2xl font-bold font-mono text-zinc-100">
-            {stats?.queue_depth_and_lag?.lag_seconds ?? 0}
-            <span className="text-xs font-normal text-zinc-500 ml-1.5">seconds</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-zinc-800/80 flex items-center justify-between text-xs font-mono text-zinc-400">
-            <span>Processing / Done</span>
-            <span className="font-medium text-zinc-200">
-              {stats?.queue_depth_and_lag?.processing ?? 0} / {stats?.queue_depth_and_lag?.done ?? 0}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Split Layout: Active Incidents Feed & System Breakdown */}
+      {/* 3. Main Split View: "Needs attention" Hero Queue (Left) & Calm Live Feed (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Cols: Active Incidents List */}
-        <div className="lg:col-span-2 space-y-3">
+        {/* Left Column (2 Cols): Grouped Incidents Queue */}
+        <section className="lg:col-span-2 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <h3 className="text-sm font-semibold text-zinc-200">Active Incidents Requiring Attention</h3>
-              <span className="text-xs font-mono bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">
-                {openIncidents.length}
+              <h2 className="text-sm font-semibold text-[var(--ink)] tracking-tight">
+                Needs attention
+              </h2>
+              <span className="px-2 py-0.5 rounded-full text-xs font-mono font-medium bg-[var(--hairline)] text-[var(--muted)]">
+                {groupedIncidents.length}
               </span>
             </div>
-            <button
-              onClick={() => onNavigateTab('incidents')}
-              className="text-xs font-medium text-zinc-400 hover:text-zinc-200 transition flex items-center space-x-1"
-            >
-              <span>View All</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+
+            <div className="hidden sm:flex items-center space-x-3 text-xs text-[var(--muted)] font-mono">
+              <span>J/K move</span>
+              <span>·</span>
+              <span>A acknowledge</span>
+              <span>·</span>
+              <span>R resolve</span>
+            </div>
           </div>
 
-          {openIncidents.length === 0 ? (
-            <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-10 text-center">
-              <CheckCircle2 className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
-              <div className="text-sm font-medium text-zinc-300">All Systems Nominal</div>
-              <p className="text-xs text-zinc-500 mt-1">No open or acknowledged incidents at this time.</p>
+          {groupedIncidents.length === 0 ? (
+            <div className="bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-panel,12px)] p-12 text-center space-y-2 shadow-sm">
+              <CheckCircle2 className="w-8 h-8 text-[var(--healthy)] mx-auto" />
+              <div className="text-sm font-semibold text-[var(--ink)]">
+                No incidents. New ones will appear here the moment a rule triggers.
+              </div>
+              <p className="text-xs text-[var(--muted)]">
+                All devices and evaluation pipelines are performing within normal parameters.
+              </p>
             </div>
           ) : (
             <div className="space-y-2">
-              {openIncidents.slice(0, 6).map((inc) => (
-                <div
-                  key={inc.id}
-                  onClick={() => onSelectIncident(inc.id)}
-                  className="bg-zinc-900/40 hover:bg-zinc-900/70 border border-zinc-800 hover:border-zinc-700/80 rounded-lg p-4 cursor-pointer transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                >
-                  <div className="space-y-1.5 flex-1 min-w-0">
-                    <div className="flex items-center space-x-2">
-                      <span
-                        className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded border uppercase ${
-                          inc.severity === 'critical'
-                            ? 'bg-red-950/60 text-red-300 border-red-800/60'
-                            : inc.severity === 'warning'
-                              ? 'bg-amber-950/60 text-amber-300 border-amber-800/60'
-                              : 'bg-zinc-800 text-zinc-300 border-zinc-700'
-                        }`}
-                      >
-                        {inc.severity}
-                      </span>
-                      <span
-                        className={`text-[10px] font-mono font-medium px-2 py-0.5 rounded border uppercase ${
-                          inc.status === 'open'
-                            ? 'bg-zinc-900 text-red-300 border-zinc-700'
-                            : 'bg-zinc-900 text-amber-300 border-zinc-700'
-                        }`}
-                      >
-                        {inc.status}
-                      </span>
-                      <span className="text-xs font-semibold text-zinc-200 truncate">
-                        {inc.rule_name || 'Rule Alert'}
-                      </span>
-                    </div>
+              {groupedIncidents.map((group, idx) => {
+                const isSelected = idx === selectedGroupIndex;
+                const isCritical = group.severity === 'critical';
+                const isOpen = group.status === 'open';
 
-                    <div className="text-xs text-zinc-400 flex items-center space-x-2 font-mono">
-                      <span>Device: <span className="text-zinc-200">{inc.device_name || inc.device_id}</span></span>
-                      <span>·</span>
-                      <span>Events: <span className="text-zinc-200">{inc.occurrence_count}</span></span>
-                      {inc.last_event_at && (
-                        <>
-                          <span>·</span>
-                          <span className="text-zinc-500">
-                            {new Date(inc.last_event_at).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              second: '2-digit',
-                            })}
-                          </span>
-                        </>
+                return (
+                  <div
+                    key={group.key}
+                    onClick={() => onSelectIncident(group.primaryId)}
+                    className={`bg-[var(--surface)] border rounded-[var(--radius-panel,12px)] p-4 cursor-pointer transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm ${
+                      isSelected
+                        ? 'border-[var(--brand)] ring-1 ring-[var(--brand)]'
+                        : 'border-[var(--hairline)] hover:border-[var(--muted)]/40'
+                    }`}
+                  >
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="flex items-center space-x-2">
+                        {/* Status Icon Indicator */}
+                        <span
+                          className={`w-2 h-2 rounded-full shrink-0 ${
+                            isCritical ? 'bg-[var(--critical)]' : 'bg-[var(--warning)]'
+                          }`}
+                        />
+
+                        {/* Severity Badge */}
+                        <span
+                          className={`px-2 py-0.5 rounded-[var(--radius-control,6px)] text-[11px] font-medium uppercase tracking-wide ${
+                            isCritical
+                              ? 'bg-[var(--critical-bg)] text-[var(--critical)]'
+                              : 'bg-[var(--warning-bg)] text-[var(--warning)]'
+                          }`}
+                        >
+                          {group.severity}
+                        </span>
+
+                        {/* Status Tag */}
+                        <span
+                          className={`px-1.5 py-0.5 rounded-[var(--radius-control,6px)] text-[11px] font-medium capitalize ${
+                            isOpen
+                              ? 'bg-[var(--canvas)] text-[var(--ink)] border border-[var(--hairline)]'
+                              : 'bg-[var(--warning-bg)] text-[var(--warning)]'
+                          }`}
+                        >
+                          {group.status}
+                        </span>
+
+                        <span className="text-sm font-semibold text-[var(--ink)] truncate">
+                          {group.rule_name}
+                        </span>
+                      </div>
+
+                      {/* Plain-English summary */}
+                      {group.summary && (
+                        <p className="text-xs text-[var(--ink)]/90 truncate max-w-xl">
+                          {group.summary}
+                        </p>
                       )}
+
+                      {/* Device, Occurrences, Relative Age */}
+                      <div className="flex items-center space-x-3 text-xs text-[var(--muted)]">
+                        <span className="font-medium text-[var(--ink)]">
+                          {group.device_name}
+                        </span>
+                        <span>·</span>
+                        <span className="inline-flex items-center space-x-1">
+                          <Flame className="w-3.5 h-3.5 text-[var(--warning)]" />
+                          <span>{group.occurrence_count} occurrences</span>
+                        </span>
+                        <span>·</span>
+                        <span
+                          title={group.last_event_at ? new Date(group.last_event_at).toLocaleString() : ''}
+                        >
+                          {group.age}
+                        </span>
+                      </div>
                     </div>
 
-                    {inc.summary && (
-                      <p className="text-xs text-zinc-400 truncate max-w-xl">
-                        {inc.summary}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center space-x-2 sm:self-center shrink-0">
-                    {inc.status === 'open' && (
-                      <ActionButton
-                        variant="warning"
-                        isOffline={isOffline}
-                        onClick={(e) => handleQuickAck(e, inc.id)}
-                      >
-                        Ack
-                      </ActionButton>
-                    )}
-                    <ActionButton
-                      variant="secondary"
-                      isOffline={isOffline}
-                      onClick={(e) => handleQuickResolve(e, inc.id)}
+                    {/* Inline Actions */}
+                    <div
+                      className="flex items-center space-x-2 shrink-0 sm:self-center"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      Resolve
-                    </ActionButton>
+                      {isOpen && (
+                        <ActionButton
+                          variant="warning"
+                          isOffline={isOffline}
+                          onClick={(e) => handleQuickAck(e, group)}
+                        >
+                          Acknowledge
+                        </ActionButton>
+                      )}
+
+                      <ActionButton
+                        variant="secondary"
+                        isOffline={isOffline}
+                        onClick={(e) => handleQuickResolve(e, group)}
+                      >
+                        Resolve
+                      </ActionButton>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
-        </div>
+        </section>
 
-        {/* Right 1 Col: Platform Telemetry & Outbox */}
-        <div className="space-y-4">
-          {/* Outbox Pipeline Status */}
-          <div className="bg-zinc-900/40 border border-zinc-800 rounded-lg p-5 space-y-3">
-            <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
-              <span className="font-medium flex items-center space-x-2">
-                <Send className="w-3.5 h-3.5 text-zinc-400" />
-                <span>OUTBOX NOTIFICATIONS</span>
-              </span>
-              <button
-                onClick={() => onNavigateTab('ops')}
-                className="text-zinc-400 hover:text-zinc-200 text-xs transition"
-              >
-                Ops &rarr;
-              </button>
-            </div>
+        {/* Right Column (1 Col): Calm Live Activity Feed */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-[var(--ink)] tracking-tight">
+              Live activity
+            </h2>
+            <button
+              onClick={() => onNavigateTab('events')}
+              className="text-xs text-[var(--brand)] hover:underline font-medium"
+            >
+              All events
+            </button>
+          </div>
 
-            <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
-              <div className="bg-zinc-950/80 p-2.5 rounded border border-zinc-800/80">
-                <div className="text-zinc-500 text-[11px]">Delivered / Sent</div>
-                <div className="text-base font-semibold text-zinc-200 mt-0.5">
-                  {stats?.outbox_state?.sent ?? 0}
-                </div>
+          <div className="bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-panel,12px)] overflow-hidden shadow-sm divide-y divide-[var(--hairline)]">
+            {liveEvents.length === 0 ? (
+              <div className="p-8 text-center text-xs text-[var(--muted)]">
+                Awaiting incoming device activity...
               </div>
-              <div className="bg-zinc-950/80 p-2.5 rounded border border-zinc-800/80">
-                <div className="text-zinc-500 text-[11px]">Pending / In-Flight</div>
-                <div className="text-base font-semibold text-zinc-200 mt-0.5">
-                  {(stats?.outbox_state?.pending ?? 0) + (stats?.outbox_state?.in_flight ?? 0)}
-                </div>
-              </div>
-              <div className="bg-zinc-950/80 p-2.5 rounded border border-zinc-800/80">
-                <div className="text-zinc-500 text-[11px]">Failed Retries</div>
-                <div className="text-base font-semibold text-amber-400 mt-0.5">
-                  {stats?.outbox_state?.failed ?? 0}
-                </div>
-              </div>
-              <div className="bg-zinc-950/80 p-2.5 rounded border border-zinc-800/80">
-                <div className="text-zinc-500 text-[11px]">Dead State</div>
+            ) : (
+              liveEvents.slice(0, 8).map((ev) => (
                 <div
-                  className={`text-base font-semibold mt-0.5 ${
-                    (stats?.outbox_state?.dead ?? 0) > 0 ? 'text-red-400' : 'text-zinc-400'
-                  }`}
+                  key={`${ev.id}-${ev.seq}`}
+                  className="p-3 text-xs flex items-center justify-between hover:bg-[var(--canvas)] transition font-mono"
                 >
-                  {stats?.outbox_state?.dead ?? 0}
+                  <div className="space-y-0.5 truncate pr-2">
+                    <div className="text-[var(--ink)] font-sans font-medium truncate">
+                      {ev.device_id}
+                    </div>
+                    <div className="text-[11px] text-[var(--muted)]">
+                      {ev.type}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0 text-[11px] text-[var(--muted)]">
+                    {ev.ts
+                      ? new Date(ev.ts).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                        })
+                      : 'now'}
+                  </div>
                 </div>
-              </div>
-            </div>
+              ))
+            )}
           </div>
-
-          {/* Quick Ops Info */}
-          <div className="bg-zinc-900/40 border border-zinc-800 rounded-lg p-5 space-y-3 font-mono text-xs">
-            <div className="flex items-center space-x-2 text-zinc-300 font-semibold">
-              <Server className="w-4 h-4 text-zinc-400" />
-              <span>PostgreSQL Durable Engine</span>
-            </div>
-            <div className="text-zinc-400 space-y-2 text-[11px]">
-              <div className="flex justify-between py-1 border-b border-zinc-800/60">
-                <span className="text-zinc-500">Queue Model:</span>
-                <span className="text-zinc-300">SKIP LOCKED + Lease</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-zinc-800/60">
-                <span className="text-zinc-500">Incident Dedup:</span>
-                <span className="text-zinc-300">rule_id:device_id index</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-zinc-800/60">
-                <span className="text-zinc-500">Event Stream:</span>
-                <span className="text-zinc-300">LISTEN change_log</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-zinc-500">Outbox Pattern:</span>
-                <span className="text-zinc-300">Transactional Delivery</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        </section>
       </div>
     </div>
   );

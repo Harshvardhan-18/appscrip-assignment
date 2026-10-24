@@ -21,15 +21,15 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
 
   const variantStyles = {
     primary:
-      'bg-zinc-100 hover:bg-zinc-200 text-zinc-950 border-transparent shadow-sm active:scale-[0.98]',
+      'bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white border-transparent shadow-sm active:scale-[0.98]',
     secondary:
-      'bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border-zinc-800 hover:border-zinc-700 active:scale-[0.98]',
+      'bg-[var(--surface)] hover:bg-[var(--canvas)] text-[var(--ink)] border-[var(--hairline)] hover:border-[var(--muted)]/40 active:scale-[0.98]',
     danger:
-      'bg-zinc-900 hover:bg-red-950/50 text-red-400 border-red-900/50 hover:border-red-800 active:scale-[0.98]',
+      'bg-[var(--critical-bg)] text-[var(--critical)] border-[var(--critical)]/25 hover:bg-[var(--critical-bg)]/80 active:scale-[0.98]',
     warning:
-      'bg-zinc-900 hover:bg-amber-950/50 text-amber-300 border-amber-900/50 hover:border-amber-800 active:scale-[0.98]',
+      'bg-[var(--warning-bg)] text-[var(--warning)] border-[var(--warning)]/25 hover:bg-[var(--warning-bg)]/80 active:scale-[0.98]',
     success:
-      'bg-zinc-900 hover:bg-emerald-950/50 text-emerald-400 border-emerald-900/50 hover:border-emerald-800 active:scale-[0.98]',
+      'bg-[var(--healthy-bg)] text-[var(--healthy)] border-[var(--healthy)]/25 hover:bg-[var(--healthy-bg)]/80 active:scale-[0.98]',
   }[variant];
 
   return (
@@ -42,7 +42,7 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
         {...props}
         disabled={effectivelyDisabled}
         title={isOffline ? offlineTooltip : title}
-        className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-all duration-150 inline-flex items-center justify-center space-x-1.5 focus:outline-none focus:ring-1 focus:ring-zinc-400 ${variantStyles} ${
+        className={`px-2.5 py-1.5 rounded-[var(--radius-control,6px)] text-xs font-medium border transition-all duration-150 inline-flex items-center justify-center space-x-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] ${variantStyles} ${
           effectivelyDisabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
         } ${className}`}
       >
@@ -52,10 +52,10 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
       {isOffline && showTooltip && (
         <div
           role="tooltip"
-          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 text-[11px] font-sans font-medium text-zinc-200 bg-zinc-900 border border-zinc-700 rounded-md shadow-xl whitespace-nowrap z-50 pointer-events-none"
+          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 text-[11px] font-sans font-medium text-[var(--ink)] bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-control,6px)] shadow-lg whitespace-nowrap z-50 pointer-events-none"
         >
           {offlineTooltip}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-zinc-900"></div>
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[var(--surface)]" />
         </div>
       )}
     </div>

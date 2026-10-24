@@ -5,20 +5,28 @@ export default {
   theme: {
     extend: {
       colors: {
-        border: 'hsl(var(--border, 240 3.7% 15.9%))',
-        background: 'hsl(var(--background, 240 10% 3.9%))',
-        foreground: 'hsl(var(--foreground, 0 0% 98%))',
-        muted: {
-          DEFAULT: 'hsl(var(--muted, 240 3.7% 15.9%))',
-          foreground: 'hsl(var(--muted-foreground, 240 5% 64.9%))',
+        canvas: 'var(--canvas)',
+        surface: 'var(--surface)',
+        ink: 'var(--ink)',
+        muted: 'var(--muted)',
+        hairline: 'var(--hairline)',
+        brand: {
+          DEFAULT: 'var(--brand)',
+          hover: 'var(--brand-hover)',
+          soft: 'var(--brand-soft)',
         },
-        card: {
-          DEFAULT: 'hsl(var(--card, 240 10% 3.9%))',
-          foreground: 'hsl(var(--card-foreground, 0 0% 98%))',
+        status: {
+          critical: 'var(--critical)',
+          'critical-bg': 'var(--critical-bg)',
+          warning: 'var(--warning)',
+          'warning-bg': 'var(--warning-bg)',
+          healthy: 'var(--healthy)',
+          'healthy-bg': 'var(--healthy-bg)',
         },
       },
       fontFamily: {
         sans: [
+          'Geist Variable',
           'Inter',
           '-apple-system',
           'BlinkMacSystemFont',
@@ -27,7 +35,7 @@ export default {
           'sans-serif',
         ],
         mono: [
-          'JetBrains Mono',
+          'Geist Mono Variable',
           'ui-monospace',
           'SFMono-Regular',
           'Menlo',
@@ -35,6 +43,10 @@ export default {
           'Consolas',
           'monospace',
         ],
+      },
+      borderRadius: {
+        control: '6px',
+        panel: '12px',
       },
     },
   },

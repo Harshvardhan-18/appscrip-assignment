@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { usePlatformStore } from '../store/PlatformContext.js';
 import { authFetch } from '../api.js';
 import { ActionButton } from '../components/ActionButton.js';
+import { useToast } from '../components/Toast.js';
 import {
   RefreshCw,
   RotateCcw,
@@ -10,15 +11,19 @@ import {
   AlertTriangle,
   Clock,
   Layers,
-  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Server,
 } from 'lucide-react';
 
 export const OpsPage: React.FC = () => {
   const { state, requeueDeadLetter, retryDeadNotifications } = usePlatformStore();
   const { stats, connection } = state;
   const isOffline = connection.status === 'offline';
+  const { showToast } = useToast();
 
   const [loading, setLoading] = useState(false);
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [deadLetters, setDeadLetters] = useState<{
     failed_events: any[];
     dead_notifications: any[];
@@ -30,7 +35,7 @@ export const OpsPage: React.FC = () => {
   });
 
   const [outboxItems, setOutboxItems] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'dead-letters' | 'outbox'>('dead-letters');
+  const [activeTab, setActiveTab] = useState<'failed-events' | 'notifications'>('failed-events');
   const [requeuing, setRequeuing] = useState(false);
 
   const fetchOpsData = async () => {
@@ -73,7 +78,7 @@ export const OpsPage: React.FC = () => {
     try {
       const success = await requeueDeadLetter({ target: 'all' });
       if (success) {
-        alert('All dead letters requeued successfully');
+        showToast('Requeued', 'All failed events returned to processing queue');
         fetchOpsData();
       }
     } finally {
@@ -86,11 +91,11 @@ export const OpsPage: React.FC = () => {
     try {
       const res = await authFetch(`/api/events/${eventId}/requeue`, { method: 'POST' });
       if (res.ok) {
-        alert(`Event ${eventId} requeued to pending`);
+        showToast('Requeued', `Event #${eventId} returned to queue`);
         fetchOpsData();
       }
     } catch (err: any) {
-      alert(`Error requeueing event: ${err.message}`);
+      showToast('Requeue failed', err.message, 'error');
     }
   };
 
@@ -100,7 +105,7 @@ export const OpsPage: React.FC = () => {
     try {
       const success = await retryDeadNotifications();
       if (success) {
-        alert('Retried all dead outbox notifications');
+        showToast('Retried', 'All dead notifications queued for delivery');
         fetchOpsData();
       }
     } finally {
@@ -108,171 +113,198 @@ export const OpsPage: React.FC = () => {
     }
   };
 
-  const totalDeadLetters =
+  const totalFailed =
     deadLetters.failed_events.length +
     deadLetters.dead_notifications.length +
     deadLetters.rejected_events.length;
 
   return (
-    <div className="space-y-6 font-mono text-xs">
-      {/* Header and Quick Stats */}
-      <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-zinc-100 tracking-tight">
-              System Operations &amp; Diagnostics
-            </h2>
-            <p className="text-zinc-400 mt-1">
-              Durable queue health, dead-letter DLQ recovery, and transactional outbox webhook audit
-            </p>
-          </div>
+    <div className="space-y-6">
+      {/* Header and Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[var(--ink)]">
+            Operations &amp; Diagnostics
+          </h1>
+          <p className="text-xs text-[var(--muted)] mt-0.5">
+            Processing queues, dead-letter recovery, and webhook delivery status
+          </p>
+        </div>
 
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={fetchOpsData}
-              disabled={loading}
-              className="px-3 py-1.5 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 hover:border-zinc-700 transition flex items-center space-x-1.5"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
-            </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={fetchOpsData}
+            disabled={loading}
+            className="px-2.5 py-1.5 rounded-[var(--radius-control,6px)] bg-[var(--surface)] hover:bg-[var(--canvas)] text-[var(--muted)] hover:text-[var(--ink)] border border-[var(--hairline)] transition text-xs flex items-center space-x-1.5"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
 
-            <ActionButton
-              isOffline={isOffline}
-              variant="warning"
-              disabled={requeuing || totalDeadLetters === 0}
-              onClick={handleRequeueAll}
-            >
-              <RotateCcw className="w-3.5 h-3.5 mr-1" />
-              <span>{requeuing ? 'Requeuing...' : 'Requeue All Dead Letters'}</span>
-            </ActionButton>
+          <ActionButton
+            isOffline={isOffline}
+            variant="warning"
+            disabled={requeuing || totalFailed === 0}
+            onClick={handleRequeueAll}
+          >
+            <RotateCcw className="w-3.5 h-3.5 mr-1" />
+            <span>{requeuing ? 'Requeueing...' : 'Requeue all failed events'}</span>
+          </ActionButton>
+        </div>
+      </div>
+
+      {/* Operator Status Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-[var(--surface)] p-4 rounded-[var(--radius-panel,12px)] border border-[var(--hairline)] space-y-1 shadow-sm">
+          <div className="text-xs text-[var(--muted)]">Waiting to process</div>
+          <div className="text-2xl font-medium tabular-nums text-[var(--ink)]">
+            {stats?.queue_depth_and_lag.depth ?? 0}
           </div>
         </div>
 
-        {/* Diagnostics Metrics Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 pt-2">
-          <div className="bg-zinc-950 p-3 rounded-md border border-zinc-800">
-            <span className="text-[10px] text-zinc-500 block uppercase">QUEUE DEPTH</span>
-            <span className="text-lg font-semibold text-zinc-100">
-              {stats?.queue_depth_and_lag.depth ?? 0}
-            </span>
+        <div className="bg-[var(--surface)] p-4 rounded-[var(--radius-panel,12px)] border border-[var(--hairline)] space-y-1 shadow-sm">
+          <div className="text-xs text-[var(--muted)]">Processing delay</div>
+          <div
+            className={`text-2xl font-medium tabular-nums ${
+              (stats?.queue_depth_and_lag.lag_seconds ?? 0) > 30
+                ? 'text-[var(--critical)]'
+                : 'text-[var(--healthy)]'
+            }`}
+          >
+            {stats?.queue_depth_and_lag.lag_seconds ?? 0}
+            <span className="text-xs font-normal text-[var(--muted)] ml-1">seconds</span>
           </div>
+        </div>
 
-          <div className="bg-zinc-950 p-3 rounded-md border border-zinc-800">
-            <span className="text-[10px] text-zinc-500 block uppercase">QUEUE LAG</span>
-            <span
-              className={`text-lg font-semibold ${
-                (stats?.queue_depth_and_lag.lag_seconds ?? 0) > 30
-                  ? 'text-red-400'
-                  : 'text-emerald-400'
-              }`}
-            >
-              {stats?.queue_depth_and_lag.lag_seconds ?? 0}s
-            </span>
+        <div className="bg-[var(--surface)] p-4 rounded-[var(--radius-panel,12px)] border border-[var(--hairline)] space-y-1 shadow-sm">
+          <div className="text-xs text-[var(--muted)]">Failed events</div>
+          <div
+            className={`text-2xl font-medium tabular-nums ${
+              totalFailed > 0 ? 'text-[var(--critical)]' : 'text-[var(--ink)]'
+            }`}
+          >
+            {totalFailed}
           </div>
+        </div>
 
-          <div className="bg-zinc-950 p-3 rounded-md border border-zinc-800">
-            <span className="text-[10px] text-zinc-500 block uppercase">PROCESSING</span>
-            <span className="text-lg font-semibold text-amber-300">
-              {stats?.queue_depth_and_lag.processing ?? 0}
-            </span>
-          </div>
-
-          <div className="bg-zinc-950 p-3 rounded-md border border-zinc-800">
-            <span className="text-[10px] text-zinc-500 block uppercase">DONE (COMMITTED)</span>
-            <span className="text-lg font-semibold text-emerald-400">
-              {stats?.queue_depth_and_lag.done ?? 0}
-            </span>
-          </div>
-
-          <div className="bg-zinc-950 p-3 rounded-md border border-zinc-800">
-            <span className="text-[10px] text-zinc-500 block uppercase">DEAD LETTERS</span>
-            <span
-              className={`text-lg font-semibold ${
-                totalDeadLetters > 0 ? 'text-red-400' : 'text-zinc-400'
-              }`}
-            >
-              {totalDeadLetters}
-            </span>
-          </div>
-
-          <div className="bg-zinc-950 p-3 rounded-md border border-zinc-800">
-            <span className="text-[10px] text-zinc-500 block uppercase">OUTBOX SENT</span>
-            <span className="text-lg font-semibold text-zinc-100">{stats?.outbox_state.sent ?? 0}</span>
+        <div className="bg-[var(--surface)] p-4 rounded-[var(--radius-panel,12px)] border border-[var(--hairline)] space-y-1 shadow-sm">
+          <div className="text-xs text-[var(--muted)]">Delivered notifications</div>
+          <div className="text-2xl font-medium tabular-nums text-[var(--ink)]">
+            {stats?.outbox_state.sent ?? 0}
           </div>
         </div>
       </div>
 
-      {/* Tabs: Dead Letters vs Outbox Audit */}
-      <div className="flex items-center space-x-1 border-b border-zinc-800 pb-1">
+      {/* Collapsible Technical Details Section */}
+      <div className="bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-panel,12px)] overflow-hidden shadow-sm">
         <button
-          onClick={() => setActiveTab('dead-letters')}
-          className={`px-3 py-1.5 rounded-md font-medium transition ${
-            activeTab === 'dead-letters'
-              ? 'bg-zinc-800 text-zinc-100 border border-zinc-700/60'
-              : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
-          }`}
+          onClick={() => setShowTechnicalDetails((prev) => !prev)}
+          className="w-full px-5 py-3.5 flex items-center justify-between text-xs font-semibold text-[var(--ink)] hover:bg-[var(--canvas)] transition"
         >
-          Dead Letters ({totalDeadLetters})
+          <div className="flex items-center space-x-2">
+            <Server className="w-4 h-4 text-[var(--muted)]" />
+            <span>Technical details</span>
+          </div>
+          {showTechnicalDetails ? (
+            <ChevronDown className="w-4 h-4 text-[var(--muted)]" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-[var(--muted)]" />
+          )}
         </button>
 
-        <button
-          onClick={() => setActiveTab('outbox')}
-          className={`px-3 py-1.5 rounded-md font-medium transition ${
-            activeTab === 'outbox'
-              ? 'bg-zinc-800 text-zinc-100 border border-zinc-700/60'
-              : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
-          }`}
-        >
-          Notification Outbox ({outboxItems.length})
-        </button>
-      </div>
-
-      {/* Dead Letters View */}
-      {activeTab === 'dead-letters' && (
-        <div className="space-y-6">
-          {/* Failed Events */}
-          <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg overflow-hidden">
-            <div className="px-5 py-3 border-b border-zinc-800 bg-zinc-900/70 flex items-center justify-between">
-              <span className="font-semibold text-zinc-100">
-                Failed Events (Exceeded Max Retries) - {deadLetters.failed_events.length}
-              </span>
+        {showTechnicalDetails && (
+          <div className="px-5 pb-5 pt-2 border-t border-[var(--hairline)] space-y-3 font-mono text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3 bg-[var(--canvas)] rounded-[var(--radius-control,6px)] border border-[var(--hairline)]">
+                <span className="text-[10px] text-[var(--muted)] block">IN-FLIGHT LEASES</span>
+                <span className="font-semibold text-[var(--ink)]">
+                  {stats?.queue_depth_and_lag.processing ?? 0}
+                </span>
+              </div>
+              <div className="p-3 bg-[var(--canvas)] rounded-[var(--radius-control,6px)] border border-[var(--hairline)]">
+                <span className="text-[10px] text-[var(--muted)] block">COMMITTED DONE</span>
+                <span className="font-semibold text-[var(--healthy)]">
+                  {stats?.queue_depth_and_lag.done ?? 0}
+                </span>
+              </div>
+              <div className="p-3 bg-[var(--canvas)] rounded-[var(--radius-control,6px)] border border-[var(--hairline)]">
+                <span className="text-[10px] text-[var(--muted)] block">CIRCUIT BREAKER</span>
+                <span className="font-semibold text-[var(--healthy)]">CLOSED (HEALTHY)</span>
+              </div>
+              <div className="p-3 bg-[var(--canvas)] rounded-[var(--radius-control,6px)] border border-[var(--hairline)]">
+                <span className="text-[10px] text-[var(--muted)] block">MALFORMED REJECTIONS</span>
+                <span className="font-semibold text-[var(--ink)]">
+                  {deadLetters.rejected_events.length}
+                </span>
+              </div>
             </div>
+          </div>
+        )}
+      </div>
 
+      {/* Tabs: Failed Events vs Notifications */}
+      <div className="space-y-4">
+        <div className="flex items-center space-x-1 border-b border-[var(--hairline)] pb-1">
+          <button
+            onClick={() => setActiveTab('failed-events')}
+            className={`px-3 py-1.5 rounded-[var(--radius-control,6px)] text-xs font-medium transition ${
+              activeTab === 'failed-events'
+                ? 'bg-[var(--brand-soft)] text-[var(--brand)] font-semibold'
+                : 'text-[var(--muted)] hover:text-[var(--ink)]'
+            }`}
+          >
+            Failed events ({deadLetters.failed_events.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('notifications')}
+            className={`px-3 py-1.5 rounded-[var(--radius-control,6px)] text-xs font-medium transition ${
+              activeTab === 'notifications'
+                ? 'bg-[var(--brand-soft)] text-[var(--brand)] font-semibold'
+                : 'text-[var(--muted)] hover:text-[var(--ink)]'
+            }`}
+          >
+            Notifications ({outboxItems.length})
+          </button>
+        </div>
+
+        {/* Failed Events View */}
+        {activeTab === 'failed-events' && (
+          <div className="bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-panel,12px)] overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-zinc-950 text-zinc-400 text-[11px] uppercase border-b border-zinc-800">
+              <table className="w-full text-left text-xs font-mono">
+                <thead className="bg-[var(--canvas)] text-[var(--muted)] text-[11px] font-medium border-b border-[var(--hairline)] font-sans">
                   <tr>
                     <th className="px-4 py-2.5 font-semibold">Event ID</th>
                     <th className="px-4 py-2.5 font-semibold">Device</th>
                     <th className="px-4 py-2.5 font-semibold">Attempts</th>
-                    <th className="px-4 py-2.5 font-semibold">Last Error</th>
-                    <th className="px-4 py-2.5 font-semibold text-right">Requeue</th>
+                    <th className="px-4 py-2.5 font-semibold">Last error</th>
+                    <th className="px-4 py-2.5 font-semibold text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-850">
+                <tbody className="divide-y divide-[var(--hairline)]">
                   {deadLetters.failed_events.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-5 py-8 text-center text-zinc-500">
-                        No failed events in dead-letter queue.
+                      <td colSpan={5} className="px-5 py-8 text-center text-[var(--muted)] font-sans">
+                        No failed events in queue.
                       </td>
                     </tr>
                   ) : (
                     deadLetters.failed_events.map((ev) => (
-                      <tr key={ev.event_id || ev.id} className="hover:bg-zinc-900/50 transition">
-                        <td className="px-4 py-2 font-semibold text-zinc-200 select-all">
+                      <tr key={ev.event_id || ev.id} className="hover:bg-[var(--canvas)] transition">
+                        <td className="px-4 py-2.5 font-medium text-[var(--ink)] select-all">
                           {ev.event_id || ev.id}
                         </td>
-                        <td className="px-4 py-2 text-zinc-300">{ev.device_id}</td>
-                        <td className="px-4 py-2">
-                          <span className="px-1.5 py-0.5 rounded bg-red-950/80 text-red-300 border border-red-900/60 font-semibold text-[10px]">
+                        <td className="px-4 py-2.5 text-[var(--ink)]">{ev.device_id}</td>
+                        <td className="px-4 py-2.5">
+                          <span className="px-1.5 py-0.5 rounded-[var(--radius-control,6px)] bg-[var(--critical-bg)] text-[var(--critical)] font-semibold text-[11px]">
                             {ev.attempts} attempts
                           </span>
                         </td>
-                        <td className="px-4 py-2 text-red-300 max-w-xs truncate">
+                        <td className="px-4 py-2.5 text-[var(--critical)] max-w-xs truncate font-sans text-xs">
                           {ev.last_error || 'Execution failed'}
                         </td>
-                        <td className="px-4 py-2 text-right">
+                        <td className="px-4 py-2.5 text-right font-sans">
                           <ActionButton
                             isOffline={isOffline}
                             variant="secondary"
@@ -288,44 +320,63 @@ export const OpsPage: React.FC = () => {
               </table>
             </div>
           </div>
+        )}
 
-          {/* Rejected Malformed Events */}
-          <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg overflow-hidden">
-            <div className="px-5 py-3 border-b border-zinc-800 bg-zinc-900/70">
-              <span className="font-semibold text-zinc-100">
-                Rejected Malformed Events (Capped) - {deadLetters.rejected_events.length}
-              </span>
+        {/* Notifications View */}
+        {activeTab === 'notifications' && (
+          <div className="bg-[var(--surface)] border border-[var(--hairline)] rounded-[var(--radius-panel,12px)] overflow-hidden shadow-sm p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--ink)]">Notification deliveries</h3>
+                <p className="text-xs text-[var(--muted)]">
+                  Audit of operator webhook deliveries with idempotency keys
+                </p>
+              </div>
+
+              <ActionButton isOffline={isOffline} variant="warning" onClick={handleRetryAllOutbox}>
+                Retry failed notifications
+              </ActionButton>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-zinc-950 text-zinc-400 text-[11px] uppercase border-b border-zinc-800">
+            <div className="overflow-x-auto border border-[var(--hairline)] rounded-[var(--radius-control,6px)]">
+              <table className="w-full text-left text-xs font-mono">
+                <thead className="bg-[var(--canvas)] text-[var(--muted)] text-[11px] font-medium border-b border-[var(--hairline)] font-sans">
                   <tr>
-                    <th className="px-4 py-2.5 font-semibold">Device ID</th>
-                    <th className="px-4 py-2.5 font-semibold">Rejection Reason</th>
-                    <th className="px-4 py-2.5 font-semibold">Received At</th>
-                    <th className="px-4 py-2.5 font-semibold">Raw Payload</th>
+                    <th className="px-4 py-2.5 font-semibold">Delivery key</th>
+                    <th className="px-4 py-2.5 font-semibold">Incident</th>
+                    <th className="px-4 py-2.5 font-semibold">Status</th>
+                    <th className="px-4 py-2.5 font-semibold">Received</th>
+                    <th className="px-4 py-2.5 font-semibold">Payload</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-850">
-                  {deadLetters.rejected_events.length === 0 ? (
+                <tbody className="divide-y divide-[var(--hairline)]">
+                  {outboxItems.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-5 py-8 text-center text-zinc-500">
-                        No rejected events stored.
+                      <td colSpan={5} className="px-5 py-8 text-center text-[var(--muted)] font-sans">
+                        No notifications delivered yet.
                       </td>
                     </tr>
                   ) : (
-                    deadLetters.rejected_events.map((r, idx) => (
-                      <tr key={idx} className="hover:bg-zinc-900/50 transition">
-                        <td className="px-4 py-2 font-semibold text-zinc-200">{r.device_id}</td>
-                        <td className="px-4 py-2 text-red-300">{r.reason}</td>
-                        <td className="px-4 py-2 text-zinc-400 whitespace-nowrap">
-                          {new Date(r.received_at || r.created_at).toLocaleTimeString()}
+                    outboxItems.map((item, idx) => (
+                      <tr key={item.id || idx} className="hover:bg-[var(--canvas)] transition">
+                        <td className="px-4 py-2.5 text-[var(--ink)] select-all">
+                          {item.idempotency_key || item.id}
                         </td>
-                        <td className="px-4 py-2 text-zinc-400 max-w-sm truncate text-[11px]">
-                          {typeof r.raw_payload === 'object'
-                            ? JSON.stringify(r.raw_payload)
-                            : String(r.raw_payload)}
+                        <td className="px-4 py-2.5 text-[var(--muted)]">
+                          {item.body?.incident_id || 'N/A'}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className="px-2 py-0.5 rounded-[var(--radius-control,6px)] text-[10px] font-sans font-medium uppercase bg-[var(--healthy-bg)] text-[var(--healthy)]">
+                            Delivered
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-[var(--muted)] whitespace-nowrap">
+                          {new Date(item.received_at).toLocaleTimeString()}
+                        </td>
+                        <td className="px-4 py-2.5 text-[var(--muted)] max-w-sm truncate text-[11px]">
+                          {typeof item.body === 'object'
+                            ? JSON.stringify(item.body)
+                            : String(item.body)}
                         </td>
                       </tr>
                     ))
@@ -334,75 +385,8 @@ export const OpsPage: React.FC = () => {
               </table>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Outbox View */}
-      {activeTab === 'outbox' && (
-        <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg overflow-hidden space-y-4 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="font-semibold text-zinc-100 block text-sm">
-                Transactional Outbox &amp; Webhook Sink Receiver
-              </span>
-              <span className="text-zinc-400 text-[11px]">
-                Auditing operator webhook deliveries with idempotency keys and exponential backoff
-              </span>
-            </div>
-
-            <ActionButton isOffline={isOffline} variant="warning" onClick={handleRetryAllOutbox}>
-              Retry Failed &amp; Dead Outbox
-            </ActionButton>
-          </div>
-
-          <div className="overflow-x-auto border border-zinc-800 rounded-lg">
-            <table className="w-full text-left">
-              <thead className="bg-zinc-950 text-zinc-400 text-[11px] uppercase border-b border-zinc-800">
-                <tr>
-                  <th className="px-4 py-2.5 font-semibold">Outbox ID / Key</th>
-                  <th className="px-4 py-2.5 font-semibold">Incident ID</th>
-                  <th className="px-4 py-2.5 font-semibold">Status</th>
-                  <th className="px-4 py-2.5 font-semibold">Received At</th>
-                  <th className="px-4 py-2.5 font-semibold">Payload Data</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-850">
-                {outboxItems.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-5 py-12 text-center text-zinc-500">
-                      No webhook notifications received by sink yet.
-                    </td>
-                  </tr>
-                ) : (
-                  outboxItems.map((item, idx) => (
-                    <tr key={item.id || idx} className="hover:bg-zinc-900/50 transition">
-                      <td className="px-4 py-2 font-semibold text-zinc-200 select-all">
-                        {item.idempotency_key || item.id}
-                      </td>
-                      <td className="px-4 py-2 text-zinc-300">
-                        {item.body?.incident_id || 'N/A'}
-                      </td>
-                      <td className="px-4 py-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-zinc-800 text-emerald-400 border border-emerald-900/60">
-                          DELIVERED
-                        </span>
-                      </td>
-                      <td className="px-4 py-2 text-zinc-400 whitespace-nowrap">
-                        {new Date(item.received_at).toLocaleTimeString()}
-                      </td>
-                      <td className="px-4 py-2 text-zinc-300 max-w-sm truncate text-[11px]">
-                        {typeof item.body === 'object'
-                          ? JSON.stringify(item.body)
-                          : String(item.body)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

@@ -211,8 +211,32 @@ export const PlatformProvider: React.FC<{
 
     connectSSE();
 
+    const handleOffline = () => {
+      if (!isMounted) return;
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      dispatch({
+        type: 'SET_CONNECTION',
+        status: 'offline',
+        offlineSince: new Date(),
+      });
+    };
+
+    const handleOnline = () => {
+      if (!isMounted) return;
+      connectSSE();
+      void fetchInitialState();
+    };
+
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
