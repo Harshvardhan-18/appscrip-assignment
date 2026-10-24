@@ -2,6 +2,16 @@ import React, { useState, useMemo } from 'react';
 import { usePlatformStore } from '../store/PlatformContext.js';
 import { Rule, RuleType, IncidentSeverity } from '../types.js';
 import { ActionButton } from '../components/ActionButton.js';
+import {
+  Sliders,
+  Plus,
+  Trash2,
+  X,
+  Layers,
+  Clock,
+  ShieldAlert,
+  SlidersHorizontal,
+} from 'lucide-react';
 
 export const RulesPage: React.FC = () => {
   const { state, createRule, deleteRule, toggleRuleEnabled } = usePlatformStore();
@@ -20,15 +30,10 @@ export const RulesPage: React.FC = () => {
   const [cooldown, setCooldown] = useState<number>(60);
 
   // Dynamic Rule Config State
-  // 1. Threshold
   const [threshField, setThreshField] = useState('temperature');
   const [threshOp, setThreshOp] = useState<'>' | '>=' | '<' | '<=' | '==' | '!='>('>');
   const [threshValue, setThreshValue] = useState<number>(80);
-
-  // 2. Absence
   const [absenceTimeout, setAbsenceTimeout] = useState<number>(60);
-
-  // 3. Event Type
   const [eventTypeVal, setEventTypeVal] = useState('device.error');
 
   const rulesList = useMemo(() => Object.values(rules), [rules]);
@@ -109,11 +114,11 @@ export const RulesPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Header & New Rule Button */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+      <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">Rules Engine</h2>
-          <p className="text-xs text-slate-400 mt-1 font-mono">
-            Pure evaluation pipelines for threshold, absence detection, and event types
+          <h2 className="text-lg font-semibold text-zinc-100 tracking-tight">Rules Engine</h2>
+          <p className="text-xs text-zinc-400 mt-1 font-mono">
+            Deterministic evaluation pipelines for telemetry thresholds, device absence, and event types
           </p>
         </div>
 
@@ -125,45 +130,46 @@ export const RulesPage: React.FC = () => {
             setIsModalOpen(true);
           }}
         >
-          + Create New Rule
+          <Plus className="w-3.5 h-3.5 mr-1" />
+          <span>Create New Rule</span>
         </ActionButton>
       </div>
 
       {/* Rules Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-slate-950/60 text-slate-400 border-b border-slate-800 text-[11px] uppercase tracking-wider">
+            <thead className="bg-zinc-900/70 text-zinc-400 border-b border-zinc-800 text-[11px] uppercase tracking-wider">
               <tr>
                 <th className="px-5 py-3 font-semibold">Rule Name</th>
                 <th className="px-5 py-3 font-semibold">Type</th>
                 <th className="px-5 py-3 font-semibold">Condition Config</th>
                 <th className="px-5 py-3 font-semibold">Scope</th>
                 <th className="px-5 py-3 font-semibold">Severity</th>
-                <th className="px-5 py-3 font-semibold">Enabled</th>
+                <th className="px-5 py-3 font-semibold">State</th>
                 <th className="px-5 py-3 font-semibold text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-zinc-850">
               {rulesList.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-16 text-center text-slate-500">
-                    No rules configured yet. Click '+ Create New Rule' to add one.
+                  <td colSpan={7} className="px-5 py-12 text-center text-zinc-500">
+                    No rules configured yet. Click 'Create New Rule' to add one.
                   </td>
                 </tr>
               ) : (
                 rulesList.map((rule: Rule) => (
-                  <tr key={rule.id} className="hover:bg-slate-800/40 transition">
+                  <tr key={rule.id} className="hover:bg-zinc-900/50 transition">
                     <td className="px-5 py-3.5">
-                      <div className="font-bold text-white text-sm">{rule.name}</div>
-                      <div className="text-[10px] text-slate-500">{rule.id}</div>
+                      <div className="font-semibold text-zinc-100">{rule.name}</div>
+                      <div className="text-[10px] text-zinc-500 font-mono">{rule.id}</div>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-teal-950 text-teal-300 border border-teal-850">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-medium uppercase bg-zinc-800 text-zinc-300 border border-zinc-700/60">
                         {rule.rule_type || rule.type}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-slate-300">
+                    <td className="px-5 py-3.5 text-zinc-300">
                       {rule.rule_type === 'threshold' && (
                         <span>
                           {rule.config?.field} {rule.config?.operator} {rule.config?.value}
@@ -177,19 +183,19 @@ export const RulesPage: React.FC = () => {
                       )}
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="text-slate-300 uppercase text-[11px]">
+                      <span className="text-zinc-300 uppercase text-[11px]">
                         {rule.scope_type || rule.scope?.type || 'all'}
                         {rule.scope_value ? `: ${rule.scope_value}` : ''}
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
                       <span
-                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                        className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase border ${
                           rule.severity === 'critical'
-                            ? 'bg-rose-500/20 text-rose-300'
+                            ? 'bg-red-950/60 text-red-300 border-red-800/60'
                             : rule.severity === 'warning'
-                              ? 'bg-amber-500/20 text-amber-300'
-                              : 'bg-sky-500/20 text-sky-300'
+                              ? 'bg-amber-950/60 text-amber-300 border-amber-800/60'
+                              : 'bg-zinc-800 text-zinc-300 border-zinc-700'
                         }`}
                       >
                         {rule.severity}
@@ -204,9 +210,9 @@ export const RulesPage: React.FC = () => {
                           onChange={(e) => toggleRuleEnabled(rule.id, e.target.checked)}
                           className="sr-only peer"
                         />
-                        <div className="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-teal-600"></div>
-                        <span className="ml-2 text-[10px] text-slate-400">
-                          {rule.enabled ? 'ON' : 'OFF'}
+                        <div className="w-8 h-4 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-300 after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-zinc-200 peer-checked:after:bg-zinc-950"></div>
+                        <span className="ml-2 text-[10px] text-zinc-400 font-mono">
+                          {rule.enabled ? 'ENABLED' : 'MUTED'}
                         </span>
                       </label>
                     </td>
@@ -216,6 +222,7 @@ export const RulesPage: React.FC = () => {
                         variant="danger"
                         onClick={() => handleDelete(rule.id, rule.name)}
                       >
+                        <Trash2 className="w-3.5 h-3.5 mr-1" />
                         Delete
                       </ActionButton>
                     </td>
@@ -230,67 +237,67 @@ export const RulesPage: React.FC = () => {
       {/* Create Rule Modal Form */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-lg w-full p-6 shadow-2xl space-y-5 font-mono text-xs">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white">Create Detection Rule</h3>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-lg max-w-lg w-full p-6 shadow-2xl space-y-5 font-mono text-xs animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <h3 className="text-base font-semibold text-zinc-100">Create Detection Rule</h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-white"
+                className="text-zinc-500 hover:text-zinc-300 p-1"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleCreateSubmit} className="space-y-4">
               {/* Rule Name */}
               <div className="space-y-1">
-                <label className="text-slate-400 font-semibold">Rule Name *</label>
+                <label className="text-zinc-400 font-medium">Rule Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Engine High Temperature Alarm"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-teal-500"
+                  className="w-full px-3 py-2 rounded-md bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
                 />
               </div>
 
               {/* Rule Type Selector */}
               <div className="space-y-1">
-                <label className="text-slate-400 font-semibold">Rule Type *</label>
+                <label className="text-zinc-400 font-medium">Rule Type *</label>
                 <select
                   value={ruleType}
                   onChange={(e) => setRuleType(e.target.value as RuleType)}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-teal-500"
+                  className="w-full px-3 py-2 rounded-md bg-zinc-950 border border-zinc-800 text-zinc-200 focus:outline-none focus:border-zinc-500"
                 >
-                  <option value="threshold">Threshold (Telemetry value &gt; N)</option>
+                  <option value="threshold">Threshold (Telemetry payload value &gt; N)</option>
                   <option value="absence">Absence (Device silence &gt; N seconds)</option>
-                  <option value="event_type">Event Type (Exact match type == error)</option>
+                  <option value="event_type">Event Type (Exact match on type)</option>
                 </select>
               </div>
 
               {/* Dynamic Form per Rule Type */}
               {ruleType === 'threshold' && (
-                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-3">
-                  <span className="font-bold text-teal-400 block">Threshold Condition</span>
+                <div className="p-3 bg-zinc-950 rounded-md border border-zinc-800 space-y-3">
+                  <span className="font-semibold text-zinc-200 block">Threshold Condition</span>
                   <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <label className="text-[10px] text-slate-500">Field</label>
+                      <label className="text-[10px] text-zinc-500">Field</label>
                       <input
                         type="text"
                         required
                         value={threshField}
                         onChange={(e) => setThreshField(e.target.value)}
                         placeholder="temperature"
-                        className="w-full px-2 py-1.5 rounded bg-slate-900 border border-slate-800 text-white"
+                        className="w-full px-2 py-1.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-100"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-slate-500">Operator</label>
+                      <label className="text-[10px] text-zinc-500">Operator</label>
                       <select
                         value={threshOp}
                         onChange={(e) => setThreshOp(e.target.value as any)}
-                        className="w-full px-2 py-1.5 rounded bg-slate-900 border border-slate-800 text-white"
+                        className="w-full px-2 py-1.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-200"
                       >
                         <option value=">">&gt;</option>
                         <option value=">=">&gt;=</option>
@@ -301,14 +308,14 @@ export const RulesPage: React.FC = () => {
                       </select>
                     </div>
                     <div>
-                      <label className="text-[10px] text-slate-500">Threshold Value</label>
+                      <label className="text-[10px] text-zinc-500">Threshold Value</label>
                       <input
                         type="number"
                         step="any"
                         required
                         value={threshValue}
                         onChange={(e) => setThreshValue(Number(e.target.value))}
-                        className="w-full px-2 py-1.5 rounded bg-slate-900 border border-slate-800 text-white"
+                        className="w-full px-2 py-1.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-100"
                       />
                     </div>
                   </div>
@@ -316,10 +323,10 @@ export const RulesPage: React.FC = () => {
               )}
 
               {ruleType === 'absence' && (
-                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-2">
-                  <span className="font-bold text-teal-400 block">Absence Detection</span>
+                <div className="p-3 bg-zinc-950 rounded-md border border-zinc-800 space-y-2">
+                  <span className="font-semibold text-zinc-200 block">Absence Detection</span>
                   <div>
-                    <label className="text-[10px] text-slate-500">
+                    <label className="text-[10px] text-zinc-500">
                       Timeout in Seconds (Device silent for &gt; N)
                     </label>
                     <input
@@ -328,24 +335,24 @@ export const RulesPage: React.FC = () => {
                       required
                       value={absenceTimeout}
                       onChange={(e) => setAbsenceTimeout(Number(e.target.value))}
-                      className="w-full px-3 py-1.5 rounded bg-slate-900 border border-slate-800 text-white"
+                      className="w-full px-3 py-1.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-100"
                     />
                   </div>
                 </div>
               )}
 
               {ruleType === 'event_type' && (
-                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-2">
-                  <span className="font-bold text-teal-400 block">Event Type Match</span>
+                <div className="p-3 bg-zinc-950 rounded-md border border-zinc-800 space-y-2">
+                  <span className="font-semibold text-zinc-200 block">Event Type Match</span>
                   <div>
-                    <label className="text-[10px] text-slate-500">Target Event Type</label>
+                    <label className="text-[10px] text-zinc-500">Target Event Type</label>
                     <input
                       type="text"
                       required
                       value={eventTypeVal}
                       onChange={(e) => setEventTypeVal(e.target.value)}
                       placeholder="e.g. device.error, tamper"
-                      className="w-full px-3 py-1.5 rounded bg-slate-900 border border-slate-800 text-white"
+                      className="w-full px-3 py-1.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-100"
                     />
                   </div>
                 </div>
@@ -354,11 +361,11 @@ export const RulesPage: React.FC = () => {
               {/* Scope & Severity */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-slate-400 font-semibold">Scope</label>
+                  <label className="text-zinc-400 font-medium">Scope</label>
                   <select
                     value={scopeType}
                     onChange={(e) => setScopeType(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white"
+                    className="w-full px-3 py-2 rounded-md bg-zinc-950 border border-zinc-800 text-zinc-200"
                   >
                     <option value="all">All Devices (Global)</option>
                     <option value="location">Specific Location</option>
@@ -367,11 +374,11 @@ export const RulesPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-slate-400 font-semibold">Severity</label>
+                  <label className="text-zinc-400 font-medium">Severity</label>
                   <select
                     value={severity}
                     onChange={(e) => setSeverity(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white"
+                    className="w-full px-3 py-2 rounded-md bg-zinc-950 border border-zinc-800 text-zinc-200"
                   >
                     <option value="critical">Critical</option>
                     <option value="warning">Warning</option>
@@ -382,14 +389,14 @@ export const RulesPage: React.FC = () => {
 
               {scopeType !== 'all' && (
                 <div className="space-y-1">
-                  <label className="text-slate-400 font-semibold">
+                  <label className="text-zinc-400 font-medium">
                     {scopeType === 'location' ? 'Location ID' : 'Device ID'}
                   </label>
                   {scopeType === 'device' ? (
                     <select
                       value={scopeValue}
                       onChange={(e) => setScopeValue(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white"
+                      className="w-full px-3 py-2 rounded-md bg-zinc-950 border border-zinc-800 text-zinc-200"
                     >
                       <option value="">Select Device</option>
                       {Object.values(devices).map((d) => (
@@ -404,7 +411,7 @@ export const RulesPage: React.FC = () => {
                       placeholder="e.g. loc-warehouse-1"
                       value={scopeValue}
                       onChange={(e) => setScopeValue(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white"
+                      className="w-full px-3 py-2 rounded-md bg-zinc-950 border border-zinc-800 text-zinc-100"
                     />
                   )}
                 </div>
@@ -412,22 +419,22 @@ export const RulesPage: React.FC = () => {
 
               {/* Cooldown */}
               <div className="space-y-1">
-                <label className="text-slate-400 font-semibold">Cooldown (Seconds)</label>
+                <label className="text-zinc-400 font-medium">Cooldown (Seconds)</label>
                 <input
                   type="number"
                   min="0"
                   value={cooldown}
                   onChange={(e) => setCooldown(Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-white"
+                  className="w-full px-3 py-2 rounded-md bg-zinc-950 border border-zinc-800 text-zinc-100"
                 />
               </div>
 
               {/* Actions */}
-              <div className="pt-3 border-t border-slate-800 flex justify-end space-x-3">
+              <div className="pt-3 border-t border-zinc-800 flex justify-end space-x-3">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
+                  className="px-4 py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition"
                 >
                   Cancel
                 </button>

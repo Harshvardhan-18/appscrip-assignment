@@ -24,7 +24,7 @@ function DashboardLayout() {
   ).length;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-teal-500 selection:text-white">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-zinc-200 selection:text-zinc-950">
       {/* Persistent Connection Banner */}
       <ConnectionBanner connection={connection} onManualReconnect={refetchState} />
 

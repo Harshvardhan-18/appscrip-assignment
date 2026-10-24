@@ -106,7 +106,10 @@ export const PlatformProvider: React.FC<{
       }
 
       const currentSeq = lastSeqRef.current;
-      const url = `/api/stream?last_event_id=${currentSeq}&token=${encodeURIComponent(OPERATOR_TOKEN)}`;
+      const url =
+        currentSeq > 0
+          ? `/api/stream?last_event_id=${currentSeq}&token=${encodeURIComponent(OPERATOR_TOKEN)}`
+          : `/api/stream?token=${encodeURIComponent(OPERATOR_TOKEN)}`;
 
       const es = new EventSource(url);
       eventSourceRef.current = es;
@@ -125,9 +128,21 @@ export const PlatformProvider: React.FC<{
       };
 
       // Handle full resync requirement
-      es.addEventListener('resync_required', () => {
+      es.addEventListener('resync_required', (event: MessageEvent) => {
         if (!isMounted) return;
         console.warn('Received SSE resync_required event; refetching platform state via REST');
+        try {
+          if (event.data) {
+            const data = JSON.parse(event.data);
+            const latestSeq = Number(data.latest_seq || 0);
+            if (latestSeq > lastSeqRef.current) {
+              lastSeqRef.current = latestSeq;
+              dispatch({ type: 'UPDATE_LAST_SEQ', seq: latestSeq });
+            }
+          }
+        } catch {
+          // ignore json parse error
+        }
         void fetchInitialState();
       });
 

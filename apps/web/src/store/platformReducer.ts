@@ -55,6 +55,7 @@ export type PlatformAction =
       status: 'connected' | 'reconnecting' | 'offline';
       offlineSince?: Date | null;
     }
+  | { type: 'UPDATE_LAST_SEQ'; seq: number }
   | {
       type: 'OPTIMISTIC_UPDATE_INCIDENT';
       id: string;
@@ -333,6 +334,18 @@ export function platformReducer(
       return {
         ...state,
         liveEvents: [action.event, ...state.liveEvents].slice(0, MAX_LIVE_EVENTS),
+      };
+    }
+
+    case 'UPDATE_LAST_SEQ': {
+      const nextLastSeq = Math.max(state.lastSeq, action.seq);
+      return {
+        ...state,
+        lastSeq: nextLastSeq,
+        connection: {
+          ...state.connection,
+          lastSeq: nextLastSeq,
+        },
       };
     }
 

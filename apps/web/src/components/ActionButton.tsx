@@ -20,11 +20,16 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   const effectivelyDisabled = disabled || isOffline;
 
   const variantStyles = {
-    primary: 'bg-teal-600 hover:bg-teal-500 text-white border-teal-500',
-    secondary: 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700',
-    danger: 'bg-rose-700 hover:bg-rose-600 text-white border-rose-600',
-    warning: 'bg-amber-600 hover:bg-amber-500 text-white border-amber-500',
-    success: 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500',
+    primary:
+      'bg-zinc-100 hover:bg-zinc-200 text-zinc-950 border-transparent shadow-sm active:scale-[0.98]',
+    secondary:
+      'bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border-zinc-800 hover:border-zinc-700 active:scale-[0.98]',
+    danger:
+      'bg-zinc-900 hover:bg-red-950/50 text-red-400 border-red-900/50 hover:border-red-800 active:scale-[0.98]',
+    warning:
+      'bg-zinc-900 hover:bg-amber-950/50 text-amber-300 border-amber-900/50 hover:border-amber-800 active:scale-[0.98]',
+    success:
+      'bg-zinc-900 hover:bg-emerald-950/50 text-emerald-400 border-emerald-900/50 hover:border-emerald-800 active:scale-[0.98]',
   }[variant];
 
   return (
@@ -37,7 +42,7 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
         {...props}
         disabled={effectivelyDisabled}
         title={isOffline ? offlineTooltip : title}
-        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition flex items-center justify-center space-x-1.5 ${variantStyles} ${
+        className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-all duration-150 inline-flex items-center justify-center space-x-1.5 focus:outline-none focus:ring-1 focus:ring-zinc-400 ${variantStyles} ${
           effectivelyDisabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
         } ${className}`}
       >
@@ -47,10 +52,10 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
       {isOffline && showTooltip && (
         <div
           role="tooltip"
-          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 text-[11px] font-sans font-medium text-slate-100 bg-slate-900 border border-slate-700 rounded-md shadow-xl whitespace-nowrap z-50 pointer-events-none"
+          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 text-[11px] font-sans font-medium text-zinc-200 bg-zinc-900 border border-zinc-700 rounded-md shadow-xl whitespace-nowrap z-50 pointer-events-none"
         >
           {offlineTooltip}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900"></div>
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-zinc-900"></div>
         </div>
       )}
     </div>
